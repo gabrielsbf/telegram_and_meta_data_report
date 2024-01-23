@@ -1,2 +1,4 @@
 myenv/
 config.ini
+__pycache__/
+/*.json
