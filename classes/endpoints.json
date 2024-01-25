@@ -7,6 +7,15 @@
 
 	"face_metric1" :["/insights?metric=post_impressions_unique,post_reactions_by_type_total,post_clicks_unique,post_engaged_users,post_engaged_fan"],
 
-	"face_metric2":["?fields=shares,comments.summary(true)"]
+	"face_metric2":["?fields=shares,comments.summary(true)"],
+
+	"insta_desc": [
+	"/media?fields=comments_count,like_count,caption,media_product_type,media_type,media_url,permalink,timestamp&since=",
+	"$(since_date)",
+	"&until=",
+	"$(until_date)"],
+
+	"insta_metric_feed":["/insights?metric=impressions,reach,saved,video_views,total_interactions"],
+	"insta_metric_reels":["/insights?metric=comments,likes,plays,reach,saved,shares,total_interactions"]
 
 }
