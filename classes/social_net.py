@@ -5,6 +5,13 @@ import threading
 from utils.date_formats import *
 import json
 
+def read_config(section):
+	config = ConfigParser()
+	config.read('config.ini')
+	tuple_items = config.items(section)
+	object = {i[0] : i[1] for i in tuple_items}
+	return object
+
 class Social_Manager:
 
 	def	__init__(self, account):
@@ -45,7 +52,7 @@ class Social_Manager:
 		arrayRequest = []
 
 		for i in range(len(args)):
-			url = self.url_requests['domain'] + media + '/' + args[i] + self.url_requests['prefix_acesstoken'] + token
+			url = self.url_requests['domain'] + media + args[i] + self.url_requests['prefix_acesstoken'] + token
 			print("url request is ", url )
 			thread = threading.Thread(target=lambda : arrayRequest.append(self.fetch_data(url)))
 
@@ -65,12 +72,11 @@ class Social_Manager:
 		with open( file_folder + "/" + file_name + ".json", "w") as json_file:
 			json_file.write(archive)
 
-	def	endpoints(self, type):
+	def	endpoints(self, type, date_array=None):
 		js_obj = self.getJsonFile(file_name="endpoints", file_folder='classes')[type]
 
-		date = list(filter(lambda x : x == 'since_date' or x == 'until_date', js_obj))
-		period = return_period() if not(date == []) else None
-
+		date = list(filter(lambda x : x == '$(since_date)' or x == '$(until_date)', js_obj))
+		period = return_period(date_array) if not(date == []) else None
 		def cases(iter):
 			match iter:
 				case '$(since_date)':
@@ -85,16 +91,18 @@ class Social_Manager:
 
 		return url
 
-	def face_description(self):
-
-		first_request = self.makeRequest(self.endpoints('face_desc'),
+	def face_description(self, date_optional=None):
+		request_validated = self.endpoints('face_desc', date_optional)
+		if request_validated == False:
+			return False
+		face_request = self.makeRequest(request_validated,
 										media=self.cred['face_id'],
 										token=self.cred['token_30days'])
 
-		description_data = list(first_request[0]["data"])
+		description_data = list(face_request[0]["data"])
 
 	#print("First Dict JSON New", description_data)
-		try: next_page = first_request[0]["paging"]["next"]
+		try: next_page = face_request[0]["paging"]["next"]
 		except: next_page = 0
 
 		while next_page != 0:
@@ -125,13 +133,144 @@ class Social_Manager:
 
 		self.writeJsonFile( self.cred['face_id']
 					 		+ "-face_description",
-							new_desc)
+							new_desc,
+							"temp_data")
 		print(f"File Writed with success")
+		return new_desc
 
-	def face_post_metric(self, post_id):
-		data = self.makeRequest(post_id +
-								self.endpoints('face_metric1'),
-								post_id +
-								self.endpoints('face_metric2'),
+	def face_post_metric(self, data_obj, date_optional=None):
+		request_validated1 = self.endpoints('face_metric1', date_optional)
+		request_validated2 = self.endpoints('face_metric2', date_optional)
+		if request_validated1 == False or request_validated2 == False:
+			return False
+		data = self.makeRequest(data_obj["post_id"] +
+								request_validated1,
+								data_obj["post_id"] +
+								request_validated2,
 								token=self.cred['token_30days'])
+
+		dataCols = {}
+		dataCols["post_id"] = data_obj["post_id"]
+		try:		dataCols["shares"] = data[1]["shares"]["count"]
+		except: 	dataCols["shares"] = 0
+		dataCols["comments"] = data[1]["comments"]["summary"]["total_count"]
+		for type in data[0]["data"]:
+			metric_title = type["title"]
+			values = type["values"][0]
+			match metric_title:
+					case "Lifetime Total post Reactions by Type.":
+						reactions = type["values"][0]["value"]
+						dataCols["like"] = 0 if reactions.get("like")== None else reactions.get("like")
+						dataCols["haha"] = 0 if reactions.get("haha") == None else reactions.get("haha")
+						dataCols["love"] = 0 if reactions.get("love") == None else reactions.get("love")
+						dataCols["sorry"] = 0 if reactions.get("sorry") == None else reactions.get("sorry")
+						dataCols["wow"] = 0 if reactions.get("wow") == None else reactions.get("wow")
+						dataCols["anger"] = 0 if reactions.get("anger") == None else reactions.get("anger")
+
+					case "Lifetime Matched Audience Targeting Consumers on Post":
+						dataCols["unique_clicks_on_post"] = values.get("value")
+						#print("cliques únicos no post: ",dataCols["unique_clicks_on_post"])
+					case "Lifetime Engaged Users":
+						dataCols["engaged_users"] = values.get("value")
+					case "Lifetime People who have liked your Page and engaged with your post":
+						dataCols["engaged_fans"] = values.get("value")
+					case "Lifetime Post Total Reach":
+						dataCols["reach"] = values.get("value")
+						#print("Alcance: ", dataCols["reach"])
+					case _:
+						print("Não entrei em nenhum case")
+		return dataCols
+
+	def face_metrics(self, posts_archive='file'):
+
+		if posts_archive == 'file':
+			posts = self.getJsonFile(self.cred['face_id']
+							+ "-face_description",
+							"temp_data")
+		else:
+			posts = posts_archive
+
+		def get_metrics(value):
+			metrics = self.face_post_metric(value)
+			return metrics
+		obj = list(map(get_metrics, posts))
+		self.writeJsonFile( self.cred['face_id']
+					 		+ "-face_metrics",
+							obj,
+							"temp_data")
+		return obj
+
+	def insta_description(self, date_optional=None):
+		request_validated = self.endpoints('insta_desc', date_optional)
+		if request_validated == False:
+			return False
+		insta_request = self.makeRequest(request_validated,
+						media=self.cred['insta_id'],
+						token=self.cred['token_30days'])
+		js_obj = insta_request[0]
+		data = js_obj["data"]
+		try: next_page = insta_request[0]["paging"]["next"]
+		except: next_page = 0
+
+		while next_page != 0:
+			# print("Entering in loop While")
+			new_request = requests.get(next_page)
+			new_data_file = new_request.json()
+			new_data = list(new_data_file["data"])
+			data = data + new_data
+			try:
+				next_page = new_data_file["paging"]["next"]
+			except:
+				next_page = 0
 		return data
+
+	def insta_post_metric(self, posts, date_optional=None):
+		if posts["media_product_type"] == "FEED":
+			request_validated = self.endpoints('insta_metric_feed', date_optional)
+			if request_validated == False:
+				return False
+			url = posts["id"] + request_validated
+		elif posts["media_product_type"] == "REELS":
+			request_validated = self.endpoints('insta_metric_reels', date_optional)
+			if request_validated == False:
+				return False
+			url = posts["id"] + request_validated
+		data = self.makeRequest(url, token=self.cred["token_30days"])
+		info = data[0]["data"]
+		metrics_dict = {i["name"]: i['values'][0]['value'] for i in info}
+		metrics_dict["comments_count"] = posts["comments_count"]
+		metrics_dict["like_count"] = posts["like_count"]
+		metrics_dict["media_product_type"] = posts["media_product_type"]
+		metrics_dict["id"] = posts["id"]
+
+		return metrics_dict
+
+	def insta_metrics(self, posts_archive="file"):
+		if posts_archive == "file":
+			posts = self.getJsonFile(self.cred['face_id']
+				+ "-insta_description",
+				"temp_data")
+		else:
+			posts = posts_archive
+
+		def get_metrics(value):
+			metrics = self.insta_post_metric(value)
+			return metrics
+		obj = list(map(get_metrics, posts))
+		self.writeJsonFile(self.cred['face_id']
+							+ "-insta_metrics",
+							obj,
+							"temp_data")
+		return obj
+
+	def creating_text_for_obj(self, json, date):
+		message = f"""Métricas Facebook - datas:{date[0]} a {date[1]}:
+"""
+		separator = "-----------------------"
+		for obj in json:
+			data = "data do post : " + obj["created_time"]
+			# desc = "mensagem: " + obj["message"]
+			link = "link: " + obj["permalink_url"]
+
+			message = '\n'.join([message, data, link, separator])
+		return message
