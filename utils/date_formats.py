@@ -17,19 +17,26 @@ months = {
             12:"december"
             }
 
-def return_period():
+def return_period(date_array=None):
 
     def loop_data():
-
-        start_date = input("selecione a data inicial em formato dd/mm/yyyy: ")
-        final_date = input("selecione a data final em formato dd/mm/yyyy: ")
+        if date_array == None:
+            start_date = input("selecione a data inicial em formato dd/mm/yyyy: ")
+            final_date = input("selecione a data final em formato dd/mm/yyyy: ")
+        else:
+             start_date = date_array[0]
+             final_date = date_array[1]
 
         start_month_array = start_date.split("/")
         final_month_array = final_date.split("/")
+        try:
+            start_date_parsed = datetime.datetime(int(start_month_array[2]),int(start_month_array[1]),int(start_month_array[0]),0,0,0)
+            final_date_parsed = datetime.datetime(int(final_month_array[2]),int(final_month_array[1]),int(final_month_array[0]),23,59,59)
+        except:
+            return False
 
-        start_date_parsed = datetime.datetime(int(start_month_array[2]),int(start_month_array[1]),int(start_month_array[0]),0,0,0)
-        final_date_parsed = datetime.datetime(int(final_month_array[2]),int(final_month_array[1]),int(final_month_array[0]),23,59,59)
-
+        if date_array != None and start_date_parsed >= final_date_parsed:
+             return False
         while start_date_parsed >= final_date_parsed:
             start_date = input("selecione novamente uma data inicial em formato dd/mm/yyyy: ")
             final_date = input("selecione novamente uma data final em formato dd/mm/yyyy: ")
@@ -44,7 +51,6 @@ def return_period():
         return [start_date_parsed,final_date_parsed]
 
     arrayDatas = loop_data()
-
     start_date_parsed = arrayDatas[0]
     final_date_parsed = arrayDatas[1]
 
