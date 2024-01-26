@@ -88,8 +88,17 @@ class Social_Manager:
 		url = ''
 		for i in js_obj:
 			url = ''.join([url, cases(i)])
-
 		return url
+
+	def get_face_post_info(self, link):
+		page_id = self.cred["face_page_id"]
+		print(f"link is : {link}")
+		len_substr = link.rfind('/') + 1
+		post_id = link[len_substr:len(link)]
+		endpoint = self.endpoints('face_post_desc')
+		data = self.makeRequest(page_id +"_"+ post_id + endpoint, token=self.cred["token_30days"])
+		#PAREI AQUI. NECESSÁRIO PEGAR OS DADOS DE MÉTRICAS DOS POSTS
+		return data
 
 	def face_description(self, date_optional=None):
 		request_validated = self.endpoints('face_desc', date_optional)
@@ -200,6 +209,21 @@ class Social_Manager:
 							"temp_data")
 		return obj
 
+	def face_all_data(self, date_optional=None):
+		js_desc_obj = self.face_description(date_optional)
+		def returning_dict(desc_obj):
+			metric_obj = self.face_post_metric(desc_obj)
+			del metric_obj["post_id"]
+			dict_new = {i: desc_obj.get(i) for i in desc_obj.keys()}
+			# print("dict_before: ", dict_new)
+			dict_metrics = {i : metric_obj.get(i) for i in metric_obj.keys()}
+			dict_new.update(dict_metrics)
+			# print("dict_after: ", dict_new)
+			return dict_new
+		all_data_obj = list(map(returning_dict, js_desc_obj))
+		return all_data_obj
+
+
 	def insta_description(self, date_optional=None):
 		request_validated = self.endpoints('insta_desc', date_optional)
 		if request_validated == False:
@@ -211,7 +235,6 @@ class Social_Manager:
 		data = js_obj["data"]
 		try: next_page = insta_request[0]["paging"]["next"]
 		except: next_page = 0
-
 		while next_page != 0:
 			# print("Entering in loop While")
 			new_request = requests.get(next_page)
@@ -263,14 +286,32 @@ class Social_Manager:
 							"temp_data")
 		return obj
 
-	def creating_text_for_obj(self, json, date):
+	def creating_text_for_obj(self, json, date, separator):
+		print(json)
 		message = f"""Métricas Facebook - datas:{date[0]} a {date[1]}:
 """
-		separator = "-----------------------"
 		for obj in json:
 			data = "data do post : " + obj["created_time"]
-			# desc = "mensagem: " + obj["message"]
+			desc = "mensagem: " + obj["message"]
 			link = "link: " + obj["permalink_url"]
+			metrics = f"""****************
+MÉTRICAS
 
-			message = '\n'.join([message, data, link, separator])
+REAÇÕES:
+like:{obj["like"]}
+haha: {obj["haha"]}
+love: {obj["love"]}
+sorry: {obj["sorry"]}
+wow: {obj["wow"]}
+anger: {obj["anger"]}
+OUTRAS MÉTRICAS:
+compartilhamentos: {obj["shares"]}
+comentários: {obj["comments"]}
+alcance: {obj["reach"]}
+engajamento: {obj["unique_clicks_on_post"]}
+"""
+
+			message = '\n'.join([message, link, data, desc,	 metrics, separator])
 		return message
+
+
