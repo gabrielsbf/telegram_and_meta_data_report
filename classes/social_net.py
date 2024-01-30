@@ -26,25 +26,43 @@ class Social_Manager:
 		obj_items = {i[0] : i[1] for i in tuple_items}
 		return obj_items
 
-	def	write_new_token(self, new_token):
+	def	write_new_temp_token(self, new_token):
 		parser = ConfigParser(self.cred)
 		parser.read("config.ini")
 		parser.set(self.account_name,"token", new_token)
 		with open('./config.ini', 'w') as file:
 			parser.write(file)
 
+	def write_new_long_token(self, token_temp):
+		parser_app = self.display_credentials('myapp')
+		response = self.fetch_data(self.url_requests["domain"]
+				+"oauth/access_token?grant_type=fb_exchange_token&client_id="
+				+parser_app["client_id"]
+				+ "&client_secret="
+				+parser_app["client_secret"]
+				+"&fb_exchange_token="
+				+token_temp)
+		access_token = response["access_token"]
+		parser = ConfigParser(self.cred)
+		parser.read("config.ini")
+		parser.set(self.account_name,"token_30days", access_token)
+		with open('./config.ini', 'w') as file:
+			parser.write(file)
+
+		return access_token
+
 	def fetch_data(self, url):
 		response = requests.get(url)
 		return response.json()
 
 	def	test_req(self):
-		url_test = "https://graph.facebook.com/v18.0/me?fields=id%2Cname&access_token="
-		token = self.cred["token"]
+		url_test = "https://graph.facebook.com/v19.0/me?fields=id%2Cname&access_token="
+		token = "" if self.cred.get("token_30days") == None else self.cred["token_30days"]
 		response = self.fetch_data(url_test + token)
 		while response.get("error") != None:
 			new_token = input("Give a new token to the: " + self.account_name + " account - ")
-			self.write_new_token(new_token)
-			token = new_token
+			self.write_new_temp_token(new_token)
+			token = self.write_new_long_token(new_token)
 			response = self.fetch_data(url_test + token)
 		return True
 
@@ -290,28 +308,41 @@ class Social_Manager:
 		print(json)
 		message = f"""Métricas Facebook - datas:{date[0]} a {date[1]}:
 """
+		metric_sum = {"comments" : 0,
+					"reach": 0,
+					"shares": 0,
+					"unique_clicks_on_post": 0}
 		for obj in json:
 			data = "data do post : " + obj["created_time"]
 			desc = "mensagem: " + obj["message"]
 			link = "link: " + obj["permalink_url"]
+			metric_sum["comments"] += obj["comments"]
+			metric_sum["reach"] += obj["reach"]
+			metric_sum["shares"] += obj["shares"]
+			metric_sum["unique_clicks_on_post"] += obj["unique_clicks_on_post"]
+			# like:{obj["like"]}
+			# haha: {obj["haha"]}
+			# love: {obj["love"]}
+			# sorry: {obj["sorry"]}
+			# wow: {obj["wow"]}
+			# anger: {obj["anger"]}
 			metrics = f"""****************
 MÉTRICAS
 
-REAÇÕES:
-like:{obj["like"]}
-haha: {obj["haha"]}
-love: {obj["love"]}
-sorry: {obj["sorry"]}
-wow: {obj["wow"]}
-anger: {obj["anger"]}
-OUTRAS MÉTRICAS:
 compartilhamentos: {obj["shares"]}
 comentários: {obj["comments"]}
 alcance: {obj["reach"]}
 engajamento: {obj["unique_clicks_on_post"]}
 """
-
 			message = '\n'.join([message, link, data, desc,	 metrics, separator])
+		sum_metrics = F"""
+SOMA MÉTRICAS NO GERAL
+compartilhamentos: {metric_sum["shares"]}
+comentários: {metric_sum["comments"]}
+alcance: {metric_sum["reach"]}
+engajamento: {metric_sum["unique_clicks_on_post"]}
+"""
+		message = '\n'.join([message, sum_metrics])
 		return message
 
 
