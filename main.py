@@ -15,11 +15,13 @@ async def face_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	print(storage)
 	while len(storage) / limit > 1:
 		subtext = storage[initial:limit]
-		len_sep = subtext.rfind(separator) + len(separator) + 1
+		len_sep = subtext.rfind(separator) + len(separator)
 		text = subtext[initial:len_sep]
 		await context.bot.send_message(chat_id=update.effective_chat.id,
 									text=text)
-		storage = storage[len_sep: -1]
+		len_storage = len(storage)
+		storage = storage[len_sep: len_storage]
+		print("storage está sendo: ", storage)
 	if len(storage) > 0:
 		await context.bot.send_message(chat_id=update.effective_chat.id,
 									text=storage)
