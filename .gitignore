@@ -2,3 +2,4 @@ myenv/
 config.ini
 __pycache__/
 temp_data/*.json
+temp_data/*.xlsx

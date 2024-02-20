@@ -66,6 +66,8 @@ class Social_Manager:
 			response = self.fetch_data(url_test + token)
 		return True
 
+	# def extract_metric(self, json_obj):
+
 	def makeRequest(self, *args, media = "", token = "" ):
 		arrayRequest = []
 
@@ -90,11 +92,11 @@ class Social_Manager:
 		with open( file_folder + "/" + file_name + ".json", "w") as json_file:
 			json_file.write(archive)
 
-	def	endpoints(self, type, date_array=None):
+	def	endpoints(self, type, period_obj=None):
 		js_obj = self.getJsonFile(file_name="endpoints", file_folder='classes')[type]
 
 		date = list(filter(lambda x : x == '$(since_date)' or x == '$(until_date)', js_obj))
-		period = return_period(date_array) if not(date == []) else None
+		period = period_obj if not(date == []) else None
 		def cases(iter):
 			match iter:
 				case '$(since_date)':
@@ -108,7 +110,7 @@ class Social_Manager:
 			url = ''.join([url, cases(i)])
 		return url
 
-	def get_face_post_info(self, link):
+	def get_post_by_url(self, link):
 		page_id = self.cred["face_page_id"]
 		print(f"link is : {link}")
 		len_substr = link.rfind('/') + 1
@@ -119,7 +121,8 @@ class Social_Manager:
 		return data
 
 	def face_description(self, date_optional=None):
-		request_validated = self.endpoints('face_desc', date_optional)
+		date_obj = return_period(date_optional)
+		request_validated = self.endpoints('face_desc', date_obj)
 		if request_validated == False:
 			return False
 		face_request = self.makeRequest(request_validated,
@@ -140,7 +143,7 @@ class Social_Manager:
 			# print(f"Data File to Append: \n type: {type(dataFile)}, \n texto: {dataFile}")
 			# print("File JSON Data new", dataFile)
 			description_data =  description_data + dataFile
-			# print(f"Description Data File: \n type: {type(description_data)}, \n texto: {description_data}")
+			print(f"Description Data File: \n type: {type(description_data)}, \n texto: {description_data}")
 			try:
 				next_page = newJson_file["paging"]["next"]
 			except:
@@ -149,10 +152,12 @@ class Social_Manager:
 
 		def new_key(value):
 			new_dict = {}
-			new_dict.update({"post_id": value["id"],
-							"permalink_url" : value["permalink_url"],
-							"message" : value["message"],
-							"created_time" : value["created_time"]})
+			new_dict.update({"post_id": value.get("id"),
+							"type" : value["attachments"]["data"][0].get("media_type"),
+							"permalink_url" : value.get("permalink_url"),
+							"message" : value.get("message"),
+							"created_time" : value.get("created_time")
+							})
 			return new_dict
 
 		new_desc = list(map(new_key, description_data))
@@ -165,11 +170,12 @@ class Social_Manager:
 		print(f"File Writed with success")
 		return new_desc
 
-	def face_post_metric(self, data_obj, date_optional=None):
-		request_validated1 = self.endpoints('face_metric1', date_optional)
-		request_validated2 = self.endpoints('face_metric2', date_optional)
+	def face_post_metric(self, data_obj):
+		request_validated1 = self.endpoints('face_metric1')
+		request_validated2 = self.endpoints('face_metric2')
 		if request_validated1 == False or request_validated2 == False:
 			return False
+		print(data_obj)
 		data = self.makeRequest(data_obj["post_id"] +
 								request_validated1,
 								data_obj["post_id"] +
@@ -243,7 +249,8 @@ class Social_Manager:
 
 
 	def insta_description(self, date_optional=None):
-		request_validated = self.endpoints('insta_desc', date_optional)
+		date_obj = return_period(date_optional)
+		request_validated = self.endpoints('insta_desc', date_obj)
 		if request_validated == False:
 			return False
 		insta_request = self.makeRequest(request_validated,
@@ -263,16 +270,22 @@ class Social_Manager:
 				next_page = new_data_file["paging"]["next"]
 			except:
 				next_page = 0
+
+			self.writeJsonFile(self.cred['face_id'] +
+					  			" - insta_desc",
+								data,
+								"temp_data")
 		return data
 
 	def insta_post_metric(self, posts, date_optional=None):
+		date_obj = return_period(date_optional)
 		if posts["media_product_type"] == "FEED":
-			request_validated = self.endpoints('insta_metric_feed', date_optional)
+			request_validated = self.endpoints('insta_metric_feed', date_obj)
 			if request_validated == False:
 				return False
 			url = posts["id"] + request_validated
 		elif posts["media_product_type"] == "REELS":
-			request_validated = self.endpoints('insta_metric_reels', date_optional)
+			request_validated = self.endpoints('insta_metric_reels', date_obj)
 			if request_validated == False:
 				return False
 			url = posts["id"] + request_validated
@@ -312,10 +325,13 @@ class Social_Manager:
 					"reach": 0,
 					"shares": 0,
 					"unique_clicks_on_post": 0}
+		def message_text(prefix, obj):
+			text = prefix + obj if obj != None else prefix + "(CAMPO AUSENTE)"
+			return text
 		for obj in json:
-			data = "data do post : " + obj["created_time"]
-			desc = "mensagem: " + obj["message"]
-			link = "link: " + obj["permalink_url"]
+			data = message_text("data do post : ", obj["created_time"])
+			desc = message_text("mensagem: ", obj["message"])
+			link = message_text("link: ", obj["permalink_url"])
 			metric_sum["comments"] += obj["comments"]
 			metric_sum["reach"] += obj["reach"]
 			metric_sum["shares"] += obj["shares"]
